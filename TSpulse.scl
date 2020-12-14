@@ -1,0 +1,84 @@
+//原逻辑////////////////////
+//TS PULSE .
+IF TPFU_VAR_JawSystemOutputCamEnable.2 OR TPFU_VAR_JawSystemOutputCamEnable.3 THEN
+
+	IF DO_T40G0010SideTs THEN	
+		IF NOT VAR_TSPulsePrec THEN //如果SideTS为true同时TSPulsePrec为false则执行下面两行赋值语句
+			VAR_TSPulse := 1;   
+			VAR_TimeTS  := 0;
+		END_IF;
+	ELSE						
+		IF VAR_TSPulsePrec THEN //如果SideTS为false同时TSPulsePrec为true则执行下面两行赋值语句
+			VAR_TSPulse := 1;
+			VAR_TimeTS  := 0;
+		END_IF;
+	END_IF;
+	VAR_TSPulsePrec := DO_T40G0010SideTs;   //将SideTs的状态传递给TSPulsePrec实现下一次扫描时上一个if语句分支的交替切换
+
+	IF VAR_TSPulse OR VAR_TimeTS <= TPFU_VAR_TSOffSet THEN  //TSOffSet = 51
+		VAR_TSPulse := 0; //第一次进入该分支后 VAR_TSPulse = off
+		DO_T40G0010TSPulse := 0;    //将模块上控制TPIH输出pulse的输出点设置为低电平
+		VAR_TimeTS := VAR_TimeTS + CST_CoarseUdatePeriod;//由于CoarseUdatePeriod = 4 //进入该分支之后的每次扫描相当于给VAR_TimeTS递增4 当扫描到第13次的时候VAR_TimeTS =（4*13=52）则跳出该分支，在程序的下一个扫描周期进入本语句块的ELSE分支
+	ELSE
+		IF VAR_TimeTS <= (TPFU_VAR_TSOffSet + TPFU_VAR_TSDuration) THEN //（TSOffSet = 51.00001 + TPFU_VAR_TSDuration = 190）= 241.此刻 VAR_TimeTS = 52 那么本语句逻辑成立进入分支
+			VAR_TimeTS := VAR_TimeTS + CST_CoarseUdatePeriod;//由于CoarseUdatePeriod = 4 //进入该分支之后的每次扫描相当于给VAR_TimeTS递增4 当扫描到第48次的时候VAR_TimeTS =（52+ 4*48= 244）此时VAR_TimeTS = 244大于241则跳出该分支 进入ELSE分支
+			DO_T40G0010TSPulse := 1;//当 VAR_TimeTS的值在 52~241之间DO_T40G0010TSPulse为on则TPIH输出
+		ELSE
+			DO_T40G0010TSPulse := 0;//在跳出本语句块的上一个分支后DO_T40G0010TSPulse为off则TPIH停止输出 执行完这一句后连续执行两个END_IF等待SideTs状态的再次跳变
+		END_IF;
+	END_IF;
+ELSE
+	DO_T40G0010TSPulse := 0;
+END_IF;
+
+
+
+//仿真模型
+//////////////////////////
+//initializine
+IF S:FS THEN
+	TPFU_VAR_TSOffSet := 51.0001;//Type = real
+	TPFU_VAR_TSDuration := 190.00;//Type = real
+	CST_CoarseUdatePeriod := 4;//Type = Dint
+	TPFU_VAR_JawSystemOutputCamEnable.2 := 1;//Type = bool
+END_IF;
+
+//TS PULSE .
+IF TPFU_VAR_JawSystemOutputCamEnable.2 OR TPFU_VAR_JawSystemOutputCamEnable.3 THEN
+
+	IF DO_T40G0010SideTs THEN 
+		IF NOT VAR_TSPulsePrec THEN // Side A //如果SideTS为true同时TSPulsePrec为false则执行下面4行赋值语句
+			VAR_TSPulse := 1;
+			VAR_TimeTS  := 0;
+			CyclesOFF   := 0; // 记录TSPulse为off时的扫描次数
+			Cycles_ON   := 0; // 记录TSPulse为_on时的扫描次数
+		END_IF;
+	ELSE
+		IF VAR_TSPulsePrec THEN  //Side B  //如果SideTS为false同时TSPulsePrec为true则执行下面4行赋值语句
+			VAR_TSPulse := 1;
+			VAR_TimeTS  := 0;
+			CyclesOFF   := 0; // 记录TSPulse为off时的扫描次数
+			Cycles_ON   := 0; // 记录TSPulse为_on时的扫描次数
+		END_IF;
+	END_IF;
+	VAR_TSPulsePrec := DO_T40G0010SideTs;//将SideTs的状态传递给TSPulsePrec实现下一次扫描时上一个if语句分支的交替切换
+
+	IF VAR_TSPulse OR VAR_TimeTS <= TPFU_VAR_TSOffSet THEN // TPFU_VAR_TSOffSet = 51
+		VAR_TSPulse := 0;    //第一次进入该分支后 VAR_TSPulse = off
+		DO_T40G0010TSPulse := 0;  //将模块上控制TPIH输出pulse的输出点设置为低电平
+		CyclesOFF := CyclesOFF + 1; //TSPulse = OFF 时 每经历一次扫描递增1
+		VAR_TimeTS := VAR_TimeTS + CST_CoarseUdatePeriod;//由于CoarseUdatePeriod = 4 //进入该分支之后的每次扫描相当于给VAR_TimeTS递增4 当扫描到第13次的时候VAR_TimeTS =（4*13=52）则跳出该分支，在程序的下一个扫描周期进入本语句块的ELSE分支
+	ELSE
+		IF VAR_TimeTS <= (TPFU_VAR_TSOffSet + TPFU_VAR_TSDuration) THEN//（TSOffSet = 51.00001 + TPFU_VAR_TSDuration = 190）= 241.此刻 VAR_TimeTS = 52 那么本语句逻辑成立进入分支
+			VAR_TimeTS := VAR_TimeTS + CST_CoarseUdatePeriod;//由于CoarseUdatePeriod = 4 //进入该分支之后的每次扫描相当于给VAR_TimeTS递增4 当扫描到第48次的时候VAR_TimeTS =（52 + 4*48= 244）此时VAR_TimeTS = 244大于241则跳出该分支 进入ELSE分支
+			DO_T40G0010TSPulse := 1;//当 VAR_TimeTS的值在 52~241之间DO_T40G0010TSPulse为on则TPIH输出
+			Cycles_ON := Cycles_ON +1; //TSPulse = on时 每经历一次扫描递增1
+		ELSE
+			DO_T40G0010TSPulse := 0;//在跳出本语句块的上一个分支后DO_T40G0010TSPulse为off则TPIH停止输出 执行完这一句后连续执行两个END_IF等待SideTs状态的再次跳变
+		END_IF;
+	END_IF;
+ELSE
+	DO_T40G0010TSPulse := 0;
+END_IF;
+
+
