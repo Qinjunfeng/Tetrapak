@@ -34,7 +34,7 @@ END_IF;
 
 
 //仿真模型
-//////////////////////////
+//使用CPU的扫描次数来计算时间，类似单片机的定时机制////////////////////////
 //initializine
 IF S:FS THEN
 	TPFU_VAR_TSOffSet := 51.0001;//Type = real
